@@ -10,8 +10,14 @@ public:
       : argc_(argc - 1), argv_(argv + 1), program(argv[0])
     {}
 
-    std::string filePath() const
-    { return filepath_; }
+    std::string programPath() const
+    { return programPath_; }
+
+    std::string fontPath() const
+    { return fontPath_; }
+
+    std::string dataPath() const
+    { return dataPath_; }
 
     void printUsage();
 
@@ -21,5 +27,7 @@ private:
     int argc_;
     const char **argv_;
     std::string program{};
-    std::string filepath_{};
+    std::string programPath_{};
+    std::string fontPath_{};
+    std::string dataPath_{};
 };
