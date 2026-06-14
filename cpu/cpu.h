@@ -16,6 +16,10 @@ public:
     uint32_t getPC() const;
     void setPC(uint32_t newPC);
 
+    // metodos para los registros
+    uint32_t readRegister(size_t reg) const;
+    void writeRegister(size_t reg, uint32_t value);
+
     // metodos para HI, LO y stopped
     uint32_t getHI() const;
     void setHI(uint32_t value);
