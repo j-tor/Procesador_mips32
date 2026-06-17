@@ -41,7 +41,9 @@ target_link_libraries(vgatext PUBLIC
 # vga_test — demo / test executable
 # ============================================================================
 add_executable(vga_test main.cpp
-    vga/VGAFramebuffer.cpp)
+    vga/VGAFramebuffer.cpp
+    Recursos/CliArgs.cpp
+    file_loader.cpp)
 
 target_link_libraries(vga_test PRIVATE
     vgatext

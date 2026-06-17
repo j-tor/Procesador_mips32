@@ -15,6 +15,8 @@
 #include "vga/VGAFont.h"
 #include "vga/Keypad.h"
 #include "Timer.h"
+#include "Recursos/CliArgs.hpp"
+#include "file_loader.h"
 
 #include <array>
 #include <atomic>
@@ -90,10 +92,27 @@ void fillHelloWorld(VGAFramebuffer& fb) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << std::format("Usage: {} <font_file>\n", argv[0]);
-        std::cerr << "Font formats (auto-detected): MIF hex-per-line, PSF v1/v2, raw binary.\n";
-        return EXIT_FAILURE;
+    CliArgs args(argc, (const char**)argv);
+    
+    // Revisar si hubo error en los argumentos
+    if (args.parse()) {
+        std::cout << "Error en los argumentos de consola.\n";
+        return 1;
+    }
+
+    // Vector para guardar la memoria
+    std::vector<uint32_t> memoriaInstrucciones;
+    
+    try {
+        // Cargar el archivo
+        Fileloader loader(args.programPath());
+        memoriaInstrucciones = loader.getInstructiones();
+        
+        std::cout << "Archivo cargado correctamente.\n";
+    } catch (std::exception& e) {
+        // Mostrar el error si algo falla
+        std::cout << e.what() << "\n";
+        return 1;
     }
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -111,7 +130,7 @@ int main(int argc, char* argv[]) {
     VGATextWindow window(VGA_WINDOW_WIDTH, VGA_WINDOW_HEIGHT, keypad);
 
     // Load font from file (format auto-detected by VGAFont)
-    if (!window.initDisplay(framebuffer, argv[1], kDefaultVGAPalette)) {
+    if (!window.initDisplay(framebuffer, args.fontPath().c_str(), kDefaultVGAPalette)) {
         std::cerr << "Failed to initialize VGA display.\n";
         return EXIT_FAILURE;
     }
