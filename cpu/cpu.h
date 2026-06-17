@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include "Instruction.h"
 
 class CPU {
 public:
@@ -11,6 +12,9 @@ public:
 
     /// reset de la cpu
     void reset();
+
+    // metodo para decodificar una instruccion
+    Instruction decode(uint32_t instr);
 
     // metodo para el PC
     uint32_t getPC() const;
