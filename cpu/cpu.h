@@ -16,6 +16,10 @@ public:
     // metodo para decodificar una instruccion
     Instruction decode(uint32_t instr);
 
+    // metodos para ejecutar una instruccion
+    void execute(Instruction instr);
+    void execute(uint32_t instr_word);
+
     // metodo para el PC
     uint32_t getPC() const;
     void setPC(uint32_t newPC);

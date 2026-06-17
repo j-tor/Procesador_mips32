@@ -140,3 +140,111 @@ Instruction CPU::decode(uint32_t instr) {
     std::cout << std::format("[Decoder] Instrucción identificada: {} (raw: 0x{:08X})\n", instrName, instr);
     return decoded;
 }
+
+void CPU::execute(Instruction instr) {
+    uint32_t opcode = instr.opcode;
+    uint32_t funct = instr.funct;
+
+    //  PC + 4
+    uint32_t nextPC = PC + 4;
+
+    switch (opcode) {
+        case 0x00: { // tipo R
+            switch (funct) {
+                case 0x00: { // SLL
+                    writeRegister(instr.rd, readRegister(instr.rt) << instr.shamt);
+                    break;
+                }
+                case 0x02: { // SRL
+                    writeRegister(instr.rd, readRegister(instr.rt) >> instr.shamt);
+                    break;
+                }
+                case 0x03: { // SRA
+                    int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
+                    writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> instr.shamt));
+                    break;
+                }
+                case 0x04: { // SLLV
+                    writeRegister(instr.rd, readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F));
+                    break;
+                }
+                case 0x06: { // SRLV
+                    writeRegister(instr.rd, readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F));
+                    break;
+                }
+                case 0x07: { // SRAV
+                    int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
+                    uint32_t shift = readRegister(instr.rs) & 0x1F;
+                    writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> shift));
+                    break;
+                }
+                case 0x08: { // JR
+                    nextPC = readRegister(instr.rs);
+                    break;
+                }
+                case 0x10: { // MFHI
+                    writeRegister(instr.rd, getHI());
+                    break;
+                }
+                case 0x11: { // MTHI
+                    setHI(readRegister(instr.rs));
+                    break;
+                }
+                case 0x12: { // MFLO
+                    writeRegister(instr.rd, getLO());
+                    break;
+                }
+                case 0x13: { // MTLO
+                    setLO(readRegister(instr.rs));
+                    break;
+                }
+                case 0x18: { // MULT
+                    int64_t rs_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rs)));
+                    int64_t rt_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rt)));
+                    int64_t prod = rs_val * rt_val;
+                    setLO(static_cast<uint32_t>(prod & 0xFFFFFFFF));
+                    setHI(static_cast<uint32_t>((prod >> 32) & 0xFFFFFFFF));
+                    break;
+                }
+                case 0x19: { // MULTU
+                    uint64_t rs_val = static_cast<uint64_t>(readRegister(instr.rs));
+                    uint64_t rt_val = static_cast<uint64_t>(readRegister(instr.rt));
+                    uint64_t prod = rs_val * rt_val;
+                    setLO(static_cast<uint32_t>(prod & 0xFFFFFFFF));
+                    setHI(static_cast<uint32_t>((prod >> 32) & 0xFFFFFFFF));
+                    break;
+                }
+                case 0x1A: { // DIV
+                    int32_t rs_val = static_cast<int32_t>(readRegister(instr.rs));
+                    int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
+                    if (rt_val != 0) {
+                        setLO(static_cast<uint32_t>(rs_val / rt_val));
+                        setHI(static_cast<uint32_t>(rs_val % rt_val));
+                    }
+                    break;
+                }
+                case 0x1B: { // DIVU
+                    uint32_t rs_val = readRegister(instr.rs);
+                    uint32_t rt_val = readRegister(instr.rt);
+                    if (rt_val != 0) {
+                        setLO(rs_val / rt_val);
+                        setHI(rs_val % rt_val);
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    PC = nextPC;
+}
+
+void CPU::execute(uint32_t instr_word) {
+    Instruction instr = decode(instr_word);
+    execute(instr);
+}
