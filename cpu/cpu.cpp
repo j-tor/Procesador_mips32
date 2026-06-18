@@ -144,60 +144,60 @@ Instruction CPU::decode(uint32_t instr) {
 void CPU::execute(Instruction instr) {
     uint32_t opcode = instr.opcode;
     uint32_t funct = instr.funct;
-
-    //  PC + 4
     uint32_t nextPC = PC + 4;
+
+    int32_t simm = static_cast<int16_t>(instr.imm);
+    uint32_t uimm = instr.imm;
 
     switch (opcode) {
         case 0x00: { // tipo R
             switch (funct) {
-                case 0x00: { // SLL
-                    writeRegister(instr.rd, readRegister(instr.rt) << instr.shamt);
+                // ALU operations
+                case 0x20: // ADD
+                case 0x21: // ADDU
+                case 0x22: // SUB
+                case 0x23: // SUBU
+                case 0x24: // AND
+                case 0x25: // OR
+                case 0x26: // XOR
+                case 0x27: // NOR
+                case 0x2A: // SLT
+                case 0x2B: { // SLTU
+                    ALUResult res = executeTypeR(instr);
+                    if (!(res.overflow && (funct == 0x20 || funct == 0x22))) {
+                        writeRegister(instr.rd, res.result);
+                    }
                     break;
                 }
-                case 0x02: { // SRL
-                    writeRegister(instr.rd, readRegister(instr.rt) >> instr.shamt);
-                    break;
-                }
+                // Shifts & other pre-existing Type R
+                case 0x00: 
+                    writeRegister(instr.rd, readRegister(instr.rt) << instr.shamt); break; // SLL
+                case 0x02: 
+                    writeRegister(instr.rd, readRegister(instr.rt) >> instr.shamt); break; // SRL
                 case 0x03: { // SRA
                     int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
                     writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> instr.shamt));
                     break;
                 }
-                case 0x04: { // SLLV
-                    writeRegister(instr.rd, readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F));
-                    break;
-                }
-                case 0x06: { // SRLV
-                    writeRegister(instr.rd, readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F));
-                    break;
-                }
+                case 0x04: 
+                    writeRegister(instr.rd, readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F)); break; // SLLV
+                case 0x06: 
+                    writeRegister(instr.rd, readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F)); break; // SRLV
                 case 0x07: { // SRAV
                     int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
-                    uint32_t shift = readRegister(instr.rs) & 0x1F;
-                    writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> shift));
+                    writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> (readRegister(instr.rs) & 0x1F)));
                     break;
                 }
-                case 0x08: { // JR
-                    nextPC = readRegister(instr.rs);
-                    break;
-                }
-                case 0x10: { // MFHI
-                    writeRegister(instr.rd, getHI());
-                    break;
-                }
-                case 0x11: { // MTHI
-                    setHI(readRegister(instr.rs));
-                    break;
-                }
-                case 0x12: { // MFLO
-                    writeRegister(instr.rd, getLO());
-                    break;
-                }
-                case 0x13: { // MTLO
-                    setLO(readRegister(instr.rs));
-                    break;
-                }
+                case 0x08: 
+                    nextPC = readRegister(instr.rs); break; // JR
+                case 0x10: 
+                    writeRegister(instr.rd, getHI()); break; // MFHI
+                case 0x11: 
+                    setHI(readRegister(instr.rs)); break;   // MTHI
+                case 0x12: 
+                    writeRegister(instr.rd, getLO()); break; // MFLO
+                case 0x13: 
+                    setLO(readRegister(instr.rs)); break;   // MTLO
                 case 0x18: { // MULT
                     int64_t rs_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rs)));
                     int64_t rt_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rt)));
@@ -232,29 +232,55 @@ void CPU::execute(Instruction instr) {
                     }
                     break;
                 }
-                case 0x20: // ADD
-                case 0x21: // ADDU
-                case 0x22: // SUB
-                case 0x23: // SUBU
-                case 0x24: // AND
-                case 0x25: // OR
-                case 0x26: // XOR
-                case 0x27: // NOR
-                case 0x2A: // SLT
-                case 0x2B: { // SLTU
-                    ALUResult res = executeTypeR(instr);
-                    if (res.overflow && (funct == 0x20 || funct == 0x22)) {
-                        // Overflow aborts writeback
-                    } else {
-                        writeRegister(instr.rd, res.result);
-                    }
-                    break;
-                }
                 default:
                     break;
             }
             break;
         }
+
+        // Immediates (Tipo I)
+        case 0x08: { // ADDI
+            int32_t val = static_cast<int32_t>(readRegister(instr.rs));
+            int32_t res = val + simm;
+            if (((val ^ res) & (simm ^ res)) >= 0) writeRegister(instr.rt, res);
+            break;
+        }
+        case 0x09: 
+            writeRegister(instr.rt, readRegister(instr.rs) + simm);    
+            break; // ADDIU
+        case 0x0A: 
+            writeRegister(instr.rt, (static_cast<int32_t>(readRegister(instr.rs)) < simm) ? 1 : 0);
+            break; // SLTI
+        case 0x0B: 
+            writeRegister(instr.rt, (readRegister(instr.rs) < static_cast<uint32_t>(simm)) ? 1 : 0);
+            break; // SLTIU
+        case 0x0C: 
+            writeRegister(instr.rt, readRegister(instr.rs) & uimm); 
+            break; // ANDI
+        case 0x0D: 
+            writeRegister(instr.rt, readRegister(instr.rs) | uimm); 
+            break; // ORI
+        case 0x0E: 
+            writeRegister(instr.rt, readRegister(instr.rs) ^ uimm); 
+            break; // XORI
+        case 0x0F: writeRegister(instr.rt, uimm << 16); break;                  // LUI
+
+        // Branches (Tipo I)
+        case 0x04: 
+            if (readRegister(instr.rs) == readRegister(instr.rt)) 
+                nextPC = (PC + 4) + (simm << 2); 
+            break; // BEQ
+        case 0x05: 
+            if (readRegister(instr.rs) != readRegister(instr.rt)) 
+                nextPC = (PC + 4) + (simm << 2); 
+            break; // BNE
+        case 0x06: 
+            if (static_cast<int32_t>(readRegister(instr.rs)) <= 0) 
+                nextPC = (PC + 4) + (simm << 2); 
+            break; // BLEZ
+        case 0x07: 
+            if (static_cast<int32_t>(readRegister(instr.rs)) > 0)  nextPC = (PC + 4) + (simm << 2); break; // BGTZ
+
         default:
             break;
     }
@@ -271,11 +297,10 @@ uint32_t CPU::fetch(const std::vector<uint32_t>& memory) {
     uint32_t index = PC / 4;
     if (index >= memory.size()) {
         stopped = true;
-        throw std::out_of_range(std::format("PC (0x{:08X}) is out of instruction memory bounds (size: {} words)", PC, memory.size()));
+        throw std::out_of_range(std::format("PC (0x{:08X}) is out of instruction memory bounds ", PC, memory.size()));
     }
     return memory[index];
 }
-
 ALUResult CPU::executeTypeR(Instruction instr) {
     uint32_t opA = readRegister(instr.rs);
     uint32_t opB = readRegister(instr.rt);
@@ -304,162 +329,8 @@ void CPU::writeBack(size_t reg, uint32_t value) {
 }
 
 void CPU::step(const std::vector<uint32_t>& memory) {
-    if (stopped) {
-        std::cout << "[CPU] Simulation is stopped. Call reset() to run again.\n";
-        return;
-    }
-
-    std::cout << std::format("[Fetch] Buscando instruccion en PC: 0x{:08X}\n", PC);
-    
-    // 1. Fetch
+    if (stopped) return;
     uint32_t instr_word = fetch(memory);
-
-    // 2. Decode
     Instruction instr = decode(instr_word);
-
-    // Default PC += 4 increment
-    uint32_t nextPC = PC + 4;
-
-    // 3. Execute & 4. WriteBack (specifically type R)
-    if (instr.opcode == 0x00) { // Tipo R
-        switch (instr.funct) {
-            // ALU operations
-            case 0x20: // ADD
-            case 0x21: // ADDU
-            case 0x22: // SUB
-            case 0x23: // SUBU
-            case 0x24: // AND
-            case 0x25: // OR
-            case 0x26: // XOR
-            case 0x27: // NOR
-            case 0x2A: // SLT
-            case 0x2B: { // SLTU
-                ALUResult res = executeTypeR(instr);
-                if (res.overflow && (instr.funct == 0x20 || instr.funct == 0x22)) {
-                    std::cout << std::format("[Execute] Overflow detectado en funct 0x{:02X}! Writeback cancelado.\n", instr.funct);
-                } else {
-                    writeBack(instr.rd, res.result);
-                    std::cout << std::format("[WriteBack] rd (R{}) = 0x{:08X}\n", instr.rd, res.result);
-                }
-                break;
-            }
-            // Shifts and other Type R operations
-            case 0x00: { // SLL
-                uint32_t res = readRegister(instr.rt) << instr.shamt;
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} << {} (0x{:08X})\n", instr.rd, instr.rt, instr.shamt, res);
-                break;
-            }
-            case 0x02: { // SRL
-                uint32_t res = readRegister(instr.rt) >> instr.shamt;
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} >> {} (0x{:08X})\n", instr.rd, instr.rt, instr.shamt, res);
-                break;
-            }
-            case 0x03: { // SRA
-                int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
-                uint32_t res = static_cast<uint32_t>(rt_val >> instr.shamt);
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} SRA {} (0x{:08X})\n", instr.rd, instr.rt, instr.shamt, res);
-                break;
-            }
-            case 0x04: { // SLLV
-                uint32_t res = readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F);
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} << R{} (0x{:08X})\n", instr.rd, instr.rt, instr.rs, res);
-                break;
-            }
-            case 0x06: { // SRLV
-                uint32_t res = readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F);
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} >> R{} (0x{:08X})\n", instr.rd, instr.rt, instr.rs, res);
-                break;
-            }
-            case 0x07: { // SRAV
-                int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
-                uint32_t shift = readRegister(instr.rs) & 0x1F;
-                uint32_t res = static_cast<uint32_t>(rt_val >> shift);
-                writeBack(instr.rd, res);
-                std::cout << std::format("[WriteBack] R{} = R{} SRA R{} (0x{:08X})\n", instr.rd, instr.rt, instr.rs, res);
-                break;
-            }
-            case 0x08: { // JR
-                nextPC = readRegister(instr.rs);
-                std::cout << std::format("[Execute] JR R{} -> nextPC = 0x{:08X}\n", instr.rs, nextPC);
-                break;
-            }
-            case 0x10: { // MFHI
-                writeBack(instr.rd, getHI());
-                std::cout << std::format("[WriteBack] R{} = HI (0x{:08X})\n", instr.rd, getHI());
-                break;
-            }
-            case 0x11: { // MTHI
-                setHI(readRegister(instr.rs));
-                std::cout << std::format("[WriteBack] HI = R{} (0x{:08X})\n", instr.rs, getHI());
-                break;
-            }
-            case 0x12: { // MFLO
-                writeBack(instr.rd, getLO());
-                std::cout << std::format("[WriteBack] R{} = LO (0x{:08X})\n", instr.rd, getLO());
-                break;
-            }
-            case 0x13: { // MTLO
-                setLO(readRegister(instr.rs));
-                std::cout << std::format("[WriteBack] LO = R{} (0x{:08X})\n", instr.rs, getLO());
-                break;
-            }
-            case 0x18: { // MULT
-                int64_t rs_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rs)));
-                int64_t rt_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rt)));
-                int64_t prod = rs_val * rt_val;
-                setLO(static_cast<uint32_t>(prod & 0xFFFFFFFF));
-                setHI(static_cast<uint32_t>((prod >> 32) & 0xFFFFFFFF));
-                std::cout << std::format("[WriteBack] MULT R{}, R{} -> HI = 0x{:08X}, LO = 0x{:08X}\n", instr.rs, instr.rt, getHI(), getLO());
-                break;
-            }
-            case 0x19: { // MULTU
-                uint64_t rs_val = static_cast<uint64_t>(readRegister(instr.rs));
-                uint64_t rt_val = static_cast<uint64_t>(readRegister(instr.rt));
-                uint64_t prod = rs_val * rt_val;
-                setLO(static_cast<uint32_t>(prod & 0xFFFFFFFF));
-                setHI(static_cast<uint32_t>((prod >> 32) & 0xFFFFFFFF));
-                std::cout << std::format("[WriteBack] MULTU R{}, R{} -> HI = 0x{:08X}, LO = 0x{:08X}\n", instr.rs, instr.rt, getHI(), getLO());
-                break;
-            }
-            case 0x1A: { // DIV
-                int32_t rs_val = static_cast<int32_t>(readRegister(instr.rs));
-                int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
-                if (rt_val != 0) {
-                    setLO(static_cast<uint32_t>(rs_val / rt_val));
-                    setHI(static_cast<uint32_t>(rs_val % rt_val));
-                    std::cout << std::format("[WriteBack] DIV R{}, R{} -> HI = 0x{:08X}, LO = 0x{:08X}\n", instr.rs, instr.rt, getHI(), getLO());
-                } else {
-                    std::cout << "[Execute] Division por cero en DIV! Operacion ignorada.\n";
-                }
-                break;
-            }
-            case 0x1B: { // DIVU
-                uint32_t rs_val = readRegister(instr.rs);
-                uint32_t rt_val = readRegister(instr.rt);
-                if (rt_val != 0) {
-                    setLO(rs_val / rt_val);
-                    setHI(rs_val % rt_val);
-                    std::cout << std::format("[WriteBack] DIVU R{}, R{} -> HI = 0x{:08X}, LO = 0x{:08X}\n", instr.rs, instr.rt, getHI(), getLO());
-                } else {
-                    std::cout << "[Execute] Division por cero en DIVU! Operacion ignorada.\n";
-                }
-                break;
-            }
-            default:
-                throw std::invalid_argument(std::format("Instruccion Tipo-R no soportada con funct: 0x{:02X}", instr.funct));
-        }
-    } else {
-        // Fallback para instrucciones que no son Tipo R
-        execute(instr);
-        return; // execute ya avanzo PC
-    }
-
-    // 5. PC += 4 (o PC destino si fue JR)
-    PC = nextPC;
-    std::cout << std::format("[PC Update] Siguiente PC: 0x{:08X}\n", PC);
+    execute(instr);
 }
