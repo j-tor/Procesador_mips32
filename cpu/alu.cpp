@@ -31,6 +31,9 @@ ALUResult ALU::execute(uint32_t operand_a, uint32_t operand_b, ALUControl contro
         case ALUControl::XOR:
             res.result = operand_a ^ operand_b;
             break;
+        case ALUControl::NOR:
+            res.result = ~(operand_a | operand_b);
+            break;
         case ALUControl::SLT: {
             int32_t sa = static_cast<int32_t>(operand_a);
             int32_t sb = static_cast<int32_t>(operand_b);
@@ -86,6 +89,8 @@ std::string ALU::control_to_string(ALUControl control)
             return "OR";
         case ALUControl::XOR:  
             return "XOR";
+        case ALUControl::NOR:   
+            return "NOR";
         case ALUControl::SLT:  
             return "SLT";
         case ALUControl::SLTU: 

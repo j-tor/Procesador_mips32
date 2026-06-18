@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include <vector>
 #include "Instruction.h"
+#include "alu.h"
 
 class CPU {
 public:
@@ -13,12 +15,24 @@ public:
     /// reset de la cpu
     void reset();
 
+    // Stage-specific instruction cycle methods
+    uint32_t fetch(const std::vector<uint32_t>& memory);
+
     // metodo para decodificar una instruccion
     Instruction decode(uint32_t instr);
 
     // metodos para ejecutar una instruccion
     void execute(Instruction instr);
     void execute(uint32_t instr_word);
+    
+    // execute specifically for R-type instructions
+    ALUResult executeTypeR(Instruction instr);
+
+    // writeback result to register
+    void writeBack(size_t reg, uint32_t value);
+
+    // execute a single instruction cycle step (Fetch, Decode, Execute, WriteBack, PC+=4)
+    void step(const std::vector<uint32_t>& memory);
 
     // metodo para el PC
     uint32_t getPC() const;

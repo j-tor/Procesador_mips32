@@ -12,6 +12,7 @@ enum class ALUControl : uint8_t {
     AND,    // AND bit a bit
     OR,     // OR bit a bit
     XOR,    // XOR bit a bit
+    NOR,    // NOR bit a bit
     SLT,    // setea a 1 si el primer operando es menor que el segundo 
     SLTU    // setea a 1 si el primer operado es menor que el segundo
 };
