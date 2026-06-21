@@ -8,6 +8,8 @@
 #include "Instruction.h"
 #include "alu.h"
 
+class Memory;
+
 class CPU {
 public:
     CPU();
@@ -15,24 +17,21 @@ public:
     /// reset de la cpu
     void reset();
 
-    // Stage-specific instruction cycle methods
-    uint32_t fetch(const std::vector<uint32_t>& memory);
+    void setMemory(Memory* mem) { m_memory = mem; }
 
-    // metodo para decodificar una instruccion
+    // metodo para decodificar  instruccion
     Instruction decode(uint32_t instr);
 
-    // metodos para ejecutar una instruccion
+    // metodo para ejecutar instruccion
     void execute(Instruction instr);
     void execute(uint32_t instr_word);
     
-    // execute specifically for R-type instructions
+    // metodo para instrucciones tipo R
     ALUResult executeTypeR(Instruction instr);
 
-    // writeback result to register
     void writeBack(size_t reg, uint32_t value);
 
-    // execute a single instruction cycle step (Fetch, Decode, Execute, WriteBack, PC+=4)
-    void step(const std::vector<uint32_t>& memory);
+    void step();
 
     // metodo para el PC
     uint32_t getPC() const;
@@ -57,6 +56,7 @@ private:
     uint32_t HI{0};
     uint32_t LO{0};
     bool stopped{false};
+    Memory* m_memory{nullptr};
 
 };
 

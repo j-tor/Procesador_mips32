@@ -17,6 +17,8 @@
 #include "Timer.h"
 #include "Recursos/CliArgs.hpp"
 #include "file_loader.h"
+#include "Memory.h"
+#include "cpu/cpu.h"
 
 #include <array>
 #include <atomic>
@@ -25,6 +27,7 @@
 #include <future>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 // ============================================================================
 // Standard VGA 16-color palette (16 bytes of 4-bit VGA color codes)
@@ -93,7 +96,7 @@ void fillHelloWorld(VGAFramebuffer& fb) {
 
 int main(int argc, char* argv[]) {
     CliArgs args(argc, (const char**)argv);
-    
+
     // Revisar si hubo error en los argumentos
     if (args.parse()) {
         std::cout << "Error en los argumentos de consola.\n";
@@ -102,12 +105,12 @@ int main(int argc, char* argv[]) {
 
     // Vector para guardar la memoria
     std::vector<uint32_t> memoriaInstrucciones;
-    
+
     try {
         // Cargar el archivo
         Fileloader loader(args.programPath());
         memoriaInstrucciones = loader.getInstructiones();
-        
+
         std::cout << "Archivo cargado correctamente.\n";
     } catch (std::exception& e) {
         // Mostrar el error si algo falla
@@ -124,6 +127,11 @@ int main(int argc, char* argv[]) {
     Keypad         keypad;
     VGAFramebuffer framebuffer;
     Timer          timer;
+    Memory         memory(framebuffer, keypad, timer);
+    CPU            cpu;
+
+    memory.loadProgram(memoriaInstrucciones, 0);
+    cpu.setMemory(&memory);
 
     fillHelloWorld(framebuffer);
 
@@ -139,6 +147,7 @@ int main(int argc, char* argv[]) {
 
     std::atomic<bool> stopTimerThread{false};
     std::atomic<bool> needsCommitFrame{false};
+    std::atomic<bool> runningMode{false};
 
     auto timerFuture = std::async(std::launch::async, [&]() {
         uint32_t lastDisplayedSecond = 0;
@@ -162,11 +171,26 @@ int main(int argc, char* argv[]) {
         }
     });
 
+    auto cpuFuture = std::async(std::launch::async, [&]() {
+        while (!stopTimerThread.load(std::memory_order_acquire)) {
+            if (runningMode.load(std::memory_order_acquire) && !cpu.isStopped()) {
+                for (int i = 0; i < 5000; ++i) {
+                    cpu.step();
+                    if (cpu.isStopped()) break;
+                }
+                needsCommitFrame.store(true, std::memory_order_release);
+                window.postRepaintEvent();
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+    });
+
     std::cout << std::format(
         "VGA Text Window Test\n"
         "  Resolution: {}×{} ({} cols × {} rows)\n"
         "  Font: 8×16 bitmap\n"
         "  Press SPACE to cycle demo patterns, Q to quit\n"
+        "  [R] Reset CPU    [S] Stop/Resume CPU\n"
         "  Timer thread: updates row 0 every second\n",
         VGA_WINDOW_WIDTH, VGA_WINDOW_HEIGHT, VGA_COLS, VGA_ROWS);
 
@@ -206,6 +230,18 @@ int main(int argc, char* argv[]) {
                         }
                         window.redraw();
                         break;
+                    case SDLK_r:
+                        cpu.reset();
+                        cpu.setMemory(&memory);
+                        framebuffer.clear(0x07, 0x00);
+                        framebuffer.commitFrame();
+                        window.redraw();
+                        std::cout << "[SIM] Reset\n";
+                        break;
+                    case SDLK_s:
+                        runningMode = !runningMode;
+                        std::cout << (runningMode ? "[SIM] Running\n" : "[SIM] Stopped\n");
+                        break;
                     default: break;
                 }
                 break;
@@ -216,6 +252,7 @@ int main(int argc, char* argv[]) {
 
     stopTimerThread.store(true, std::memory_order_release);
     timerFuture.wait();
+    cpuFuture.wait();
 
     std::cout << std::format("VGA test finished. Final timer: {} ms\n", timer.read());
     return EXIT_SUCCESS;

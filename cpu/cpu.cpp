@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include "cpu.h"
+#include "Memory.h"
 
 CPU::CPU() {
     reset();
@@ -76,7 +77,7 @@ Instruction CPU::decode(uint32_t instr) {
     std::string instrName = "";
 
     switch (opcode) {
-        case 0x00: { // Tipo R
+        case 0x00: { // tipo R
             switch (funct) {
                 case 0x00: instrName = "SLL"; break;
                 case 0x02: instrName = "SRL"; break;
@@ -152,7 +153,7 @@ void CPU::execute(Instruction instr) {
     switch (opcode) {
         case 0x00: { // tipo R
             switch (funct) {
-                // ALU operations
+                // ALU operando
                 case 0x20: // ADD
                 case 0x21: // ADDU
                 case 0x22: // SUB
@@ -169,7 +170,7 @@ void CPU::execute(Instruction instr) {
                     }
                     break;
                 }
-                // Shifts & other pre-existing Type R
+                // Shifts y funciones tipo R
                 case 0x00: 
                     writeRegister(instr.rd, readRegister(instr.rt) << instr.shamt); break; // SLL
                 case 0x02: 
@@ -190,6 +191,11 @@ void CPU::execute(Instruction instr) {
                 }
                 case 0x08: 
                     nextPC = readRegister(instr.rs); break; // JR
+                case 0x09: { // JALR
+                    writeRegister(instr.rd, PC + 4);
+                    nextPC = readRegister(instr.rs);
+                    break;
+                }
                 case 0x10: 
                     writeRegister(instr.rd, getHI()); break; // MFHI
                 case 0x11: 
@@ -238,7 +244,19 @@ void CPU::execute(Instruction instr) {
             break;
         }
 
-        // Immediates (Tipo I)
+        case 0x02: { // J
+            uint32_t target = (PC & 0xF0000000) | (instr.target << 2);
+            nextPC = target;
+            break;
+        }
+        case 0x03: { // JAL
+            writeRegister(31, PC + 4);
+            uint32_t target = (PC & 0xF0000000) | (instr.target << 2);
+            nextPC = target;
+            break;
+        }
+
+        //  tipo I
         case 0x08: { // ADDI
             int32_t val = static_cast<int32_t>(readRegister(instr.rs));
             int32_t res = val + simm;
@@ -265,7 +283,7 @@ void CPU::execute(Instruction instr) {
             break; // XORI
         case 0x0F: writeRegister(instr.rt, uimm << 16); break;                  // LUI
 
-        // Branches (Tipo I)
+        // branche tipo I
         case 0x04: 
             if (readRegister(instr.rs) == readRegister(instr.rt)) 
                 nextPC = (PC + 4) + (simm << 2); 
@@ -280,6 +298,55 @@ void CPU::execute(Instruction instr) {
             break; // BLEZ
         case 0x07: 
             if (static_cast<int32_t>(readRegister(instr.rs)) > 0)  nextPC = (PC + 4) + (simm << 2); break; // BGTZ
+
+        case 0x20: { // LB
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint8_t val = m_memory->readByte(static_cast<uint32_t>(addr));
+            writeRegister(instr.rt, static_cast<int32_t>(static_cast<int8_t>(val)));
+            break;
+        }
+        case 0x21: { // LH
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint16_t val = m_memory->readHalf(static_cast<uint32_t>(addr));
+            writeRegister(instr.rt, static_cast<int32_t>(static_cast<int16_t>(val)));
+            break;
+        }
+        case 0x23: { // LW
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint32_t val = m_memory->readWord(static_cast<uint32_t>(addr));
+            writeRegister(instr.rt, val);
+            break;
+        }
+        case 0x24: { // LBU
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint8_t val = m_memory->readByte(static_cast<uint32_t>(addr));
+            writeRegister(instr.rt, val);
+            break;
+        }
+        case 0x25: { // LHU
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint16_t val = m_memory->readHalf(static_cast<uint32_t>(addr));
+            writeRegister(instr.rt, val);
+            break;
+        }
+        case 0x28: { // SB
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint8_t val = static_cast<uint8_t>(readRegister(instr.rt) & 0xFF);
+            m_memory->writeByte(static_cast<uint32_t>(addr), val);
+            break;
+        }
+        case 0x29: { // SH
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint16_t val = static_cast<uint16_t>(readRegister(instr.rt) & 0xFFFF);
+            m_memory->writeHalf(static_cast<uint32_t>(addr), val);
+            break;
+        }
+        case 0x2B: { // SW
+            int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
+            uint32_t val = readRegister(instr.rt);
+            m_memory->writeWord(static_cast<uint32_t>(addr), val);
+            break;
+        }
 
         default:
             break;
@@ -318,7 +385,7 @@ ALUResult CPU::executeTypeR(Instruction instr) {
         case 0x2A: control = ALUControl::SLT; break;
         case 0x2B: control = ALUControl::SLTU; break;
         default:
-            throw std::invalid_argument(std::format("Funct 0x{:02X} is not a valid ALU Type-R operation", instr.funct));
+            throw std::invalid_argument(std::format("Funct 0x{:02X} is not  valid ALU type-R operation", instr.funct));
     }
 
     return ALU::execute(opA, opB, control);
@@ -328,9 +395,13 @@ void CPU::writeBack(size_t reg, uint32_t value) {
     writeRegister(reg, value);
 }
 
-void CPU::step(const std::vector<uint32_t>& memory) {
+void CPU::step() {
     if (stopped) return;
-    uint32_t instr_word = fetch(memory);
+    if (!m_memory) {
+        stopped = true;
+        return;
+    }
+    uint32_t instr_word = m_memory->fetchInstruction(PC);
     Instruction instr = decode(instr_word);
     execute(instr);
 }

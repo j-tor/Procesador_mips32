@@ -28,7 +28,7 @@ public:
     // ejecuta la operacion de la alu indicada por control sobre los operandos 
     static ALUResult execute(uint32_t operand_a, uint32_t operand_b, ALUControl control);
 
-    // detecta overflow
+    // detecta  overflow
     static bool detect_add_overflow(uint32_t a, uint32_t b, uint32_t result);
     static bool detect_sub_overflow(uint32_t a, uint32_t b, uint32_t result);
 
