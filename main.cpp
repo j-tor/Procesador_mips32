@@ -130,8 +130,9 @@ int main(int argc, char* argv[]) {
     Memory         memory(framebuffer, keypad, timer);
     CPU            cpu;
 
-    memory.loadProgram(memoriaInstrucciones, 0);
+    memory.loadProgram(memoriaInstrucciones, Memory::IM_BASE);
     cpu.setMemory(&memory);
+    cpu.setPC(Memory::IM_BASE);
 
     fillHelloWorld(framebuffer);
 
@@ -233,6 +234,7 @@ int main(int argc, char* argv[]) {
                     case SDLK_r:
                         cpu.reset();
                         cpu.setMemory(&memory);
+                        cpu.setPC(Memory::IM_BASE);
                         framebuffer.clear(0x07, 0x00);
                         framebuffer.commitFrame();
                         window.redraw();

@@ -12,6 +12,7 @@ CPU::CPU() {
 void CPU::reset() {
     PC = 0;
     regs.fill(0);
+    regs[29] = 0x7FFFEFFC; 
     HI = 0;
     LO = 0;
     stopped = false;
