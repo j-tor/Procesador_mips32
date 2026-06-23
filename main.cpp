@@ -22,6 +22,7 @@
 
 #include <array>
 #include <atomic>
+#include <fstream>
 #include <cstdint>
 #include <format>
 #include <future>
@@ -134,6 +135,26 @@ int main(int argc, char* argv[]) {
     cpu.setMemory(&memory);
     cpu.setPC(Memory::IM_BASE);
 
+    try {
+        std::ifstream dataFile(args.dataPath(), std::ios::binary | std::ios::ate);
+        if (!dataFile.is_open())  
+        {
+            throw std::runtime_error("no se pudo abrir " + args.dataPath());
+        }
+        std::streamsize dataSize = dataFile.tellg();
+        dataFile.seekg(0, std::ios::beg);
+        std::vector<uint8_t> dataBytes(static_cast<size_t>(dataSize));
+        if (!dataFile.read(reinterpret_cast<char*>(dataBytes.data()), dataSize)) 
+        {
+            throw std::runtime_error("Error al leer " + args.dataPath());
+        }
+        uint32_t dataAddr = (memoriaInstrucciones.size() * 4 + 0xFF) & ~0xFF;
+        memory.loadData(dataBytes, dataAddr);
+        std::cout << "datos cargados (" << dataBytes.size() << " bytes en 0x" << std::hex << dataAddr << std::dec << ").\n";
+    } catch (std::exception& e) {
+        std::cout << "advertencia: " << e.what() << " — continuando sin datos.\n";
+    }
+
     fillHelloWorld(framebuffer);
 
     VGATextWindow window(VGA_WINDOW_WIDTH, VGA_WINDOW_HEIGHT, keypad);
@@ -175,14 +196,18 @@ int main(int argc, char* argv[]) {
     auto cpuFuture = std::async(std::launch::async, [&]() {
         while (!stopTimerThread.load(std::memory_order_acquire)) {
             if (runningMode.load(std::memory_order_acquire) && !cpu.isStopped()) {
-                for (int i = 0; i < 5000; ++i) {
+                for (int i = 0; i < 500000; ++i) {
+                    if (!runningMode.load(std::memory_order_acquire))  {
+                        break;
+                    }
                     cpu.step();
                     if (cpu.isStopped()) break;
                 }
                 needsCommitFrame.store(true, std::memory_order_release);
                 window.postRepaintEvent();
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
     });
 
@@ -232,6 +257,9 @@ int main(int argc, char* argv[]) {
                         window.redraw();
                         break;
                     case SDLK_r:
+                        runningMode.store(false, std::memory_order_release);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                        keypad.pressReset();
                         cpu.reset();
                         cpu.setMemory(&memory);
                         cpu.setPC(Memory::IM_BASE);
@@ -242,8 +270,29 @@ int main(int argc, char* argv[]) {
                         break;
                     case SDLK_s:
                         runningMode = !runningMode;
+                        keypad.pressStop();
                         std::cout << (runningMode ? "[SIM] Running\n" : "[SIM] Stopped\n");
                         break;
+                    default:
+                        switch (event.key.keysym.sym) {
+                            case SDLK_LEFT:  keypad.pressKey(0); break;
+                            case SDLK_RIGHT: keypad.pressKey(1); break;
+                            case SDLK_DOWN:  keypad.pressKey(2); break;
+                            case SDLK_UP:    keypad.pressKey(3); break;
+                            default: break;
+                        }
+                        break;
+                }
+                break;
+
+            case SDL_KEYUP:
+                switch (event.key.keysym.sym) {
+                    case SDLK_LEFT:  keypad.releaseKey(0); break;
+                    case SDLK_RIGHT: keypad.releaseKey(1); break;
+                    case SDLK_DOWN:  keypad.releaseKey(2); break;
+                    case SDLK_UP:    keypad.releaseKey(3); break;
+                    case SDLK_r: keypad.releaseReset(); break;
+                    case SDLK_s: keypad.releaseStop();  break;
                     default: break;
                 }
                 break;

@@ -43,7 +43,10 @@ target_link_libraries(vgatext PUBLIC
 add_executable(vga_test main.cpp
     vga/VGAFramebuffer.cpp
     Recursos/CliArgs.cpp
-    file_loader.cpp)
+    file_loader.cpp
+    Memory.cpp
+    cpu/cpu.cpp
+    cpu/alu.cpp)
 
 target_link_libraries(vga_test PRIVATE
     vgatext
