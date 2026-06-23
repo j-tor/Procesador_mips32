@@ -19,7 +19,7 @@ void CPU::reset() {
 
 uint32_t CPU::readRegister(size_t reg) const {
     if (reg >= regs.size()) {
-        throw std::out_of_range(std::format("Register index {} out of range (0-31)", reg));
+        throw std::out_of_range(std::format("register index {} out of range (0-31)", reg));
     }
     if (reg == 0) {
         return 0;
@@ -29,7 +29,7 @@ uint32_t CPU::readRegister(size_t reg) const {
 
 void CPU::writeRegister(size_t reg, uint32_t value) {
     if (reg >= regs.size()) {
-        throw std::out_of_range(std::format("Register index {} out of range (0-31)", reg));
+        throw std::out_of_range(std::format("register index {} out of range (0-31)", reg));
     }
     if (reg != 0) {
         regs[reg] = value;
@@ -108,7 +108,7 @@ Instruction CPU::decode(uint32_t instr) {
                 case 0x2A: instrName = "SLT"; break;
                 case 0x2B: instrName = "SLTU"; break;
                 default:
-                    throw std::invalid_argument(std::format("Instrucción Tipo-R no reconocida con funct: 0x{:02X}", funct));
+                    throw std::invalid_argument(std::format("instrucción Tipo-R no reconocida con funct: 0x{:02X}", funct));
             }
             break;
         }
@@ -138,14 +138,14 @@ Instruction CPU::decode(uint32_t instr) {
             throw std::invalid_argument(std::format("Instrucción no reconocida con opcode: 0x{:02X}", opcode));
     }
 
-    std::cout << std::format("[Decoder] Instrucción identificada: {} (raw: 0x{:08X})\n", instrName, instr);
+    // std::cout << std::format("[Decoder] Instrucción identificada: {} (raw: 0x{:08X})\n", instrName, instr);
     return decoded;
 }
 
 void CPU::execute(Instruction instr) {
-    uint32_t opcode = instr.opcode;
-    uint32_t funct = instr.funct;
-    uint32_t nextPC = PC + 4;
+    uint32_t opcode=instr.opcode;
+    uint32_t funct=instr.funct;
+    uint32_t nextPC=PC + 4;
 
     int32_t simm = static_cast<int16_t>(instr.imm);
     uint32_t uimm = instr.imm;
@@ -165,7 +165,7 @@ void CPU::execute(Instruction instr) {
                 case 0x2A: // SLT
                 case 0x2B: { // SLTU
                     ALUResult res = executeTypeR(instr);
-                    if (!(res.overflow && (funct == 0x20 || funct == 0x22))) {
+                    if (!(res.overflow &&(funct == 0x20 || funct == 0x22))) {
                         writeRegister(instr.rd, res.result);
                     }
                     break;
@@ -181,9 +181,11 @@ void CPU::execute(Instruction instr) {
                     break;
                 }
                 case 0x04: 
-                    writeRegister(instr.rd, readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F)); break; // SLLV
+                    writeRegister(instr.rd, readRegister(instr.rt) << (readRegister(instr.rs) & 0x1F)); 
+                    break; // SLLV
                 case 0x06: 
-                    writeRegister(instr.rd, readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F)); break; // SRLV
+                    writeRegister(instr.rd, readRegister(instr.rt) >> (readRegister(instr.rs) & 0x1F)); 
+                    break; // SRLV
                 case 0x07: { // SRAV
                     int32_t rt_val = static_cast<int32_t>(readRegister(instr.rt));
                     writeRegister(instr.rd, static_cast<uint32_t>(rt_val >> (readRegister(instr.rs) & 0x1F)));
@@ -193,17 +195,21 @@ void CPU::execute(Instruction instr) {
                     nextPC = readRegister(instr.rs); break; // JR
                 case 0x09: { // JALR
                     writeRegister(instr.rd, PC + 4);
-                    nextPC = readRegister(instr.rs);
+                    nextPC = readRegister(instr.rs); 
                     break;
                 }
                 case 0x10: 
-                    writeRegister(instr.rd, getHI()); break; // MFHI
+                    writeRegister(instr.rd, getHI()); 
+                    break; // MFHI
                 case 0x11: 
-                    setHI(readRegister(instr.rs)); break;   // MTHI
+                    setHI(readRegister(instr.rs));  
+                    break;   // MTHI
                 case 0x12: 
-                    writeRegister(instr.rd, getLO()); break; // MFLO
+                    writeRegister(instr.rd, getLO()); 
+                    break; // MFLO
                 case 0x13: 
-                    setLO(readRegister(instr.rs)); break;   // MTLO
+                    setLO(readRegister(instr.rs)); 
+                    break;   // MTLO
                 case 0x18: { // MULT
                     int64_t rs_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rs)));
                     int64_t rt_val = static_cast<int64_t>(static_cast<int32_t>(readRegister(instr.rt)));
@@ -245,13 +251,13 @@ void CPU::execute(Instruction instr) {
         }
 
         case 0x02: { // J
-            uint32_t target = (PC & 0xF0000000) | (instr.target << 2);
+            uint32_t target =(PC & 0xF0000000) | (instr.target << 2);
             nextPC = target;
             break;
         }
         case 0x03: { // JAL
             writeRegister(31, PC + 4);
-            uint32_t target = (PC & 0xF0000000) | (instr.target << 2);
+            uint32_t target =(PC & 0xF0000000) | (instr.target << 2);
             nextPC = target;
             break;
         }
@@ -297,11 +303,11 @@ void CPU::execute(Instruction instr) {
                 nextPC = (PC + 4) + (simm << 2); 
             break; // BLEZ
         case 0x07: 
-            if (static_cast<int32_t>(readRegister(instr.rs)) > 0)  nextPC = (PC + 4) + (simm << 2); break; // BGTZ
+            if (static_cast<int32_t>(readRegister(instr.rs)) > 0) { nextPC = (PC + 4) + (simm << 2); } break; // BGTZ
 
         case 0x20: { // LB
             int32_t addr = static_cast<int32_t>(readRegister(instr.rs)) + simm;
-            uint8_t val = m_memory->readByte(static_cast<uint32_t>(addr));
+            uint8_t val =m_memory->readByte(static_cast<uint32_t>(addr));
             writeRegister(instr.rt, static_cast<int32_t>(static_cast<int8_t>(val)));
             break;
         }
@@ -355,20 +361,13 @@ void CPU::execute(Instruction instr) {
     PC = nextPC;
 }
 
-void CPU::execute(uint32_t instr_word) {
+void CPU::execute(uint32_t instr_word)  {
     Instruction instr = decode(instr_word);
     execute(instr);
 }
 
-uint32_t CPU::fetch(const std::vector<uint32_t>& memory) {
-    uint32_t index = PC / 4;
-    if (index >= memory.size()) {
-        stopped = true;
-        throw std::out_of_range(std::format("PC (0x{:08X}) is out of instruction memory bounds ", PC, memory.size()));
-    }
-    return memory[index];
-}
-ALUResult CPU::executeTypeR(Instruction instr) {
+
+ALUResult CPU::executeTypeR(Instruction instr)  {
     uint32_t opA = readRegister(instr.rs);
     uint32_t opB = readRegister(instr.rt);
     ALUControl control;
@@ -385,7 +384,7 @@ ALUResult CPU::executeTypeR(Instruction instr) {
         case 0x2A: control = ALUControl::SLT; break;
         case 0x2B: control = ALUControl::SLTU; break;
         default:
-            throw std::invalid_argument(std::format("Funct 0x{:02X} is not  valid ALU type-R operation", instr.funct));
+            throw std::invalid_argument(std::format("Funct 0x{:02X} is not  valid ALU type-R operation", static_cast<uint32_t>(instr.funct)));
     }
 
     return ALU::execute(opA, opB, control);
@@ -397,7 +396,7 @@ void CPU::writeBack(size_t reg, uint32_t value) {
 
 void CPU::step() {
     if (stopped) return;
-    if (!m_memory) {
+    if (!m_memory)  {
         stopped = true;
         return;
     }
